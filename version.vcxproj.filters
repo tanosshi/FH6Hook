@@ -14,14 +14,17 @@
       <Filter>Source</Filter>
     </ClCompile>
     <ClCompile Include="GeneratedFiles/BuiltinImplementations.cpp">
-        <Filter>Source</Filter>
+      <Filter>Source</Filter>
     </ClCompile>
     <ClCompile Include="UserFiles/UserImplementations.cpp">
-        <Filter>Source</Filter>
+      <Filter>Source</Filter>
     </ClCompile>
     <ClCompile Include="UserFiles/tinyxml2.cpp">
       <Filter>Source</Filter>
     </ClCompile>
+    <ClCompile Include="UserFiles/AudioDiagnostics.cpp" />
+    <ClCompile Include="UserFiles/RadioTracker.cpp" />
+    <ClCompile Include="UserFiles/FmodEngine.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="Utils/MemoryPatchConfig.h">
@@ -33,15 +36,15 @@
     <ClInclude Include="Resources/resource.h">
       <Filter>Include</Filter>
     </ClInclude>
+    <ClInclude Include="UserFiles/StringUtils.h">
+      <Filter>Include</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <MASM Include="GeneratedFiles/version_x64.asm">
       <Filter>Assembly</Filter>
     </MASM>
     <MASM Include="GeneratedFiles/version_x86.asm">
-      <Filter>Assembly</Filter>
-    </MASM>
-    <MASM Include="UserFiles/FmodGhostHook.asm">
       <Filter>Assembly</Filter>
     </MASM>
   </ItemGroup>

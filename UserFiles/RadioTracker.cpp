@@ -1,8 +1,8 @@
 #include "RadioTracker.h"
 #include "FmodEngine.h"
+#include "StringUtils.h"
 #define NOMINMAX
 #include <windows.h>
-#include <atomic>
 #include <mutex>
 #include <string>
 #include <unordered_set>
@@ -13,7 +13,6 @@ extern void PipeWriteLine(const std::string& line);
 
 namespace {
 
-// r1–r9 = 9 stations.
 static constexpr int kRequiredStations = 9;
 
 static ULONGLONG g_startTick    = GetTickCount64();
@@ -27,7 +26,6 @@ static std::vector<std::string> g_pendingBankPaths;
 
 static std::unordered_set<int>  g_stationNumbersSeen;
 static bool                     g_preloadNotified = false;
-static std::atomic<bool>        g_preloadNotifyPending{false};
 
 static std::string g_pendingPrefix;
 static std::string g_pendingBank;
@@ -38,18 +36,6 @@ static void Emit(const std::string& tag, const std::string& body)
     PipeWriteLine(tag + "|" + body);
 }
 
-static std::string ToLower(std::string s)
-{
-    for (auto& c : s) c = static_cast<char>(tolower(static_cast<unsigned char>(c)));
-    return s;
-}
-
-static std::string BaseName(const std::string& path)
-{
-    size_t p = path.find_last_of("\\/");
-    return (p == std::string::npos) ? path : path.substr(p + 1);
-}
-
 static bool IsTrackBankPath(const std::string& pathLower)
 {
     return pathLower.find("fmodbanks") != std::string::npos
@@ -57,7 +43,6 @@ static bool IsTrackBankPath(const std::string& pathLower)
         && pathLower.find(".bank")     != std::string::npos;
 }
 
-// Returns "HZ6_R3_" prefix, or "" if unparseable (should be avoided lmao).
 static std::string BankPathToPrefix(const std::string& pathLower, int& stationNumberOut)
 {
     stationNumberOut = 0;
@@ -106,10 +91,10 @@ static void ScheduleArm(const std::string& prefix, const std::string& bank)
 
 static void ProcessBankFile(const std::string& path)
 {
-    std::string lower  = ToLower(path);
+    std::string lower  = FH6String::ToLower(path);
     if (!IsTrackBankPath(lower)) return;
 
-    std::string base = BaseName(lower);
+    std::string base = FH6String::BaseName(lower);
     int stationNum   = 0;
     std::string prefix = BankPathToPrefix(lower, stationNum);
     if (prefix.empty() || stationNum < 1) return;
@@ -134,7 +119,6 @@ static void ProcessBankFile(const std::string& path)
 
             if (!g_preloadNotified && seen >= kRequiredStations) {
                 g_preloadNotified      = true;
-                g_preloadNotifyPending = true;
                 Emit("STATION", "preload_gate_met|all_" + std::to_string(kRequiredStations)
                     + "_stations_confirmed");
             }
@@ -143,8 +127,7 @@ static void ProcessBankFile(const std::string& path)
     }
 
     if (!g_preloadNotified) {
-        g_preloadNotified      = true;
-        g_preloadNotifyPending = true;
+        g_preloadNotified = true;
         Emit("STATION", "preload_gate_forced|past_window");
     }
 
@@ -180,9 +163,6 @@ void RadioTrackerQueueBankFile(const std::string& path)
 void RadioTrackerTick()
 {
     FlushQueuedBankPaths();
-
-    if (g_preloadNotifyPending.exchange(false))
-        FmodEngineNotifyPreloadComplete();
 
     TryFlushDebounce();
     FmodEngineTick();

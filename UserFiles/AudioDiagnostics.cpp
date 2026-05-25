@@ -1,6 +1,7 @@
 #include "AudioDiagnostics.h"
 #include "FmodEngine.h"
 #include "RadioTracker.h"
+#include "StringUtils.h"
 #include <windows.h>
 #include <algorithm>
 #include <cstdint>
@@ -18,10 +19,6 @@ extern void PipeWriteLine(const std::string& line);
 extern void LogInfo(const std::string& m);
 extern void LogWarn(const std::string& m);
 
-// ============================================================
-//  Output queue written from hook thread, flushed on tick thread.
-//  !! PipeWriteLine must NEVER be called from inside a hook.
-// ============================================================
 namespace {
 
     static std::mutex               g_outMtx;
@@ -31,7 +28,6 @@ namespace {
     static constexpr DWORD          kReadWindowMs = 60000;
     static constexpr DWORD          kStopAfterMs = 7000;
     static constexpr DWORD          kPingEveryMs = 2000;
-    static constexpr bool           kDebugReadOffsets = false;
     static std::mutex               g_readWindowMtx;
     static std::string              g_readWindowPrefix;
     static const std::unordered_map<std::string, TrackInfo>* g_trackTable = nullptr;
@@ -55,11 +51,6 @@ namespace {
             g_outQueue.push_back(std::move(line));
     }
 
-    static std::string BaseName(const std::string& path) {
-        size_t p = path.find_last_of("\\/");
-        return (p == std::string::npos) ? path : path.substr(p + 1);
-    }
-
     static std::string ExeDir() {
         char path[MAX_PATH]{};
         GetModuleFileNameA(nullptr, path, MAX_PATH);
@@ -74,26 +65,6 @@ namespace {
         return ExeDir() + path;
     }
 
-    static std::string ToHex64(unsigned long long v) {
-        static const char* digits = "0123456789ABCDEF";
-        char buf[19]{};
-        buf[0] = '0';
-        buf[1] = 'x';
-        bool started = false;
-        int pos = 2;
-        for (int shift = 60; shift >= 0; shift -= 4) {
-            unsigned nibble = static_cast<unsigned>((v >> shift) & 0xF);
-            if (nibble || started || shift == 0) {
-                buf[pos++] = digits[nibble];
-                started = true;
-            }
-        }
-        return std::string(buf);
-    }
-
-    // ============================================================
-    //  CreateFileW hook
-    // ============================================================
     static bool g_hooksInstalled = false;
 
     typedef HANDLE(WINAPI* PFN_CreateFileW)(
@@ -124,12 +95,6 @@ namespace {
         return out;
     }
 
-    static std::string ToLower(std::string s) {
-        for (auto& c : s)
-            c = static_cast<char>(tolower(static_cast<unsigned char>(c)));
-        return s;
-    }
-
     static int StationFromSound(const std::string& sound) {
         if (sound.rfind("HZ6_R", 0) != 0) return 0;
         size_t p = 5;
@@ -142,7 +107,7 @@ namespace {
     }
 
     static int StationFromBank(const std::string& bank) {
-        std::string lower = ToLower(bank);
+        std::string lower = FH6String::ToLower(bank);
         size_t r = lower.find('r');
         size_t marker = lower.find("_tracks_");
         if (r == std::string::npos || marker == std::string::npos || r + 1 >= marker) return 0;
@@ -253,7 +218,7 @@ namespace {
     }
 
     static const TrackInfo* FindTrackForRead(const BankHandleInfo& info, unsigned long long offset) {
-        const std::string bank = ToLower(info.base);
+        const std::string bank = FH6String::ToLower(info.base);
         std::lock_guard<std::mutex> lk(g_rangeMtx);
         auto it = g_bankRanges.find(bank);
         if (it == g_bankRanges.end())
@@ -323,7 +288,7 @@ namespace {
             return;
         std::lock_guard<std::mutex> lk(g_handleMtx);
         if (g_bankHandles.size() < 128)
-            g_bankHandles[h] = BankHandleInfo{ path, BaseName(path), 0 };
+            g_bankHandles[h] = BankHandleInfo{ path, FH6String::BaseName(path), 0 };
     }
 
     static void ForgetHandle(HANDLE h) {
@@ -331,17 +296,15 @@ namespace {
         g_bankHandles.erase(h);
     }
 
-    // Check if its aradio bank, queue log line. Should return immediately
     static HANDLE WINAPI Hook_CreateFileW(
         LPCWSTR name, DWORD access, DWORD share,
         LPSECURITY_ATTRIBUTES sa, DWORD disp, DWORD attrs, HANDLE tmpl)
     {
         HANDLE result = g_origCreateFileW(name, access, share, sa, disp, attrs, tmpl);
 
-        // Do all work AFTER the original call so we never delay the game's open.
         if (name) {
             std::string path = WideToUtf8(name);
-            std::string lower = ToLower(path);
+            std::string lower = FH6String::ToLower(path);
             if (IsRadioTrackBank(lower)) {
                 RememberBankHandle(result, path);
                 RadioTrackerQueueBankFile(path);
@@ -391,16 +354,6 @@ namespace {
                 NoteMusicRead(*track);
         }
 
-        if (kDebugReadOffsets) {
-            Enqueue("READ|prefix=" + prefix
-                + "|bank=" + info.base
-                + "|ok=" + std::to_string(ok ? 1 : 0)
-                + "|req=" + std::to_string(bytesToRead)
-                + "|got=" + std::to_string(actual)
-                + "|ov=" + std::to_string(overlapped ? 1 : 0)
-                + "|offset=" + (hasOffset ? ToHex64(offset) : std::string("unknown")));
-        }
-
         SetLastError(lastError);
         return ok;
     }
@@ -412,10 +365,6 @@ namespace {
     }
 
 } // namespace
-
-// ============================================================
-//  Public API
-// ============================================================
 
 void InstallAudioDiagnosticHooks()
 {
@@ -479,10 +428,8 @@ void AudioDiagnosticsSetTrackTable(const std::unordered_map<std::string, TrackIn
     g_bankRanges.clear();
 }
 
-// Called from RadioTrackerTick, its safe now
-std::vector<uintptr_t> FlushStackQueue()
+void FlushOutputQueue()
 {
-    // Flush text
     std::vector<std::string> batch;
     {
         std::lock_guard<std::mutex> lk(g_outMtx);
@@ -490,14 +437,11 @@ std::vector<uintptr_t> FlushStackQueue()
     }
     for (const auto& line : batch)
         PipeWriteLine(line);
-
-    // this code is dead
-    return {};
 }
 
 void RunPeriodicDiagnostics()
 {
     CheckMusicStop();
-    FlushStackQueue();
+    FlushOutputQueue();
     RadioTrackerTick();
 }

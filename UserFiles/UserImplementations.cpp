@@ -10,18 +10,12 @@
 
 #include "tinyxml2.h"
 
-// ============================================================
-// CONFIGURATION
-// ============================================================
 namespace Config
 {
     constexpr const char* XML_RELATIVE_PATH = "media\\Audio\\RadioInfo_EN.xml";
     constexpr const char* PIPE_NAME         = "\\\\.\\pipe\\molotov";
 }
 
-// ============================================================
-// PIPE / LOGGING
-// ============================================================
 static HANDLE g_pipeHandle = INVALID_HANDLE_VALUE;
 
 void PipeWriteLine(const std::string& line)
@@ -55,9 +49,6 @@ void LogInfo(const std::string& m)  { Log("INFO ", m); }
 void LogWarn(const std::string& m)  { Log("WARN ", m); }
 void LogError(const std::string& m) { Log("ERROR", m); }
 
-// ============================================================
-// PATH HELPERS
-// ============================================================
 static std::string GetExeDir()
 {
     char path[MAX_PATH] = {};
@@ -73,9 +64,6 @@ static bool FileExistsA(const std::string& path)
     return (attrs != INVALID_FILE_ATTRIBUTES) && !(attrs & FILE_ATTRIBUTE_DIRECTORY);
 }
 
-// ============================================================
-// XML PARSING
-// ============================================================
 static std::unordered_map<std::string, TrackInfo>
 ParseRadioXml(const std::string& xmlPath)
 {
@@ -125,11 +113,7 @@ ParseRadioXml(const std::string& xmlPath)
     return table;
 }
 
-// ============================================================
-// BACKGROUND THREAD
-// ============================================================
 static DWORD WINAPI NowPlayingThread(LPVOID) {
-    // Wait for the game to load, 4s is enough; the bank flood happens within the first second of DLL attach.
     Sleep(4000);
 
     InstallAudioDiagnosticHooks();
@@ -162,9 +146,6 @@ static DWORD WINAPI NowPlayingThread(LPVOID) {
     return 0;
 }
 
-// ============================================================
-// AHeadLib ENTRY POINTS
-// ============================================================
 void GetOriginalLibraryPath(TCHAR* bufferPtr, int bufferLength, const TCHAR* libName)
 {
     assert(bufferPtr && libName);

@@ -1,0 +1,58 @@
+# Build outputs
+[Bb]in/
+[Bb]uild/
+[Dd]ebug/
+[Rr]elease/
+[xX]64/
+[xX]86/
+*/[Dd]ebug/
+*/[Rr]elease/
+*/[xX]64/
+*/[xX]86/
+
+# Visual Studio intermediates
+.vs/
+ipch/
+*.obj
+*.o
+*.pdb
+*.idb
+*.ilk
+*.tlog
+*.log
+*.pch
+*.res
+*.aps
+*.sdf
+*.opensdf
+*.suo
+*.user
+*.userosscache
+*.sln.docstates
+*.VC.db
+*.VC.VC.opendb
+
+# Static/dynamic libs & executables
+*.lib
+*.a
+*.dll
+*.exe
+*.exp
+
+# Generated files
+GeneratedFiles/
+
+# Temporary files
+*.tmp
+*.bak
+*.swp
+*.swo
+.DS_Store
+Thumbs.db
+
+# NuGet (if ever added)
+packages/
+*.nupkg
+
+# Logs
+*.log

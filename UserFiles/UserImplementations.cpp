@@ -16,7 +16,7 @@
 namespace Config
 {
     constexpr const char* XML_RELATIVE_PATH = "media\\Audio\\RadioInfo_EN.xml";
-    constexpr const char* PIPE_NAME         = "\\\\.\\pipe\\tanos_fh6";
+    constexpr const char* PIPE_NAME         = "\\\\.\\pipe\\molotov";
 }
 
 // ============================================================
@@ -143,7 +143,7 @@ static DWORD WINAPI NowPlayingThread(LPVOID) {
 
     AudioDiagnosticsSetTrackTable(&table);
     RadioTrackerInit(&table);
-    LogInfo("Initiated");
+    LogInfo("Initiated entirely, safe from now on");
 
     DWORD iteration = 0;
     while (true)

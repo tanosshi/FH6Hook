@@ -125,9 +125,9 @@ static DWORD WINAPI NowPlayingThread(LPVOID) {
     auto table = ParseRadioXml(xmlPath);
     if (table.empty()) { LogError("Configuration error, no tracks loaded."); return 0; }
 
-    AudioDiagnosticsSetTrackTable(&table);
+    AudioDiagnosticsSetTrackTable(table);
     RadioTrackerInit(&table);
-    LogInfo("Initiated entirely, safe from now on");
+    LogInfo("Radio tracking initialized");
 
     DWORD iteration = 0;
     while (true)
@@ -137,7 +137,6 @@ static DWORD WINAPI NowPlayingThread(LPVOID) {
         if (iteration % 25 == 0) {
             PipeWriteLine("TICK|alive|iter=" + std::to_string(iteration));
         }
-        FmodEngineTick();
         RunPeriodicDiagnostics();
 
         Sleep(200);

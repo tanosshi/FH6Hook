@@ -131,6 +131,7 @@ static void ProcessBankFile(const std::string& path)
         Emit("STATION", "preload_gate_forced|past_window");
     }
 
+    AudioDiagnosticsQueueBankCache(path);
     ScheduleArm(prefix, base);
 }
 

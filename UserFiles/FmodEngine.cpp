@@ -40,7 +40,7 @@ void FmodEngineNotifyStationBank(int stationNumber)
     if (g_stationNumbersSeen.insert(stationNumber).second
         && static_cast<int>(g_stationNumbersSeen.size()) >= kRequiredStations) {
         g_allStationsReady = true;
-        Pipe("SETUP", "gate_open_waiting_for_radio_switch");
+        Pipe("SETUP", "gate_open");
     }
 }
 

@@ -17,5 +17,4 @@ struct TrackInfo
 void InstallAudioDiagnosticHooks();
 void RunPeriodicDiagnostics();
 void AudioDiagnosticsArmReadWindow(const std::string& stationPrefix);
-void AudioDiagnosticsQueueBankCache(const std::string& path);
 void AudioDiagnosticsSetTrackTable(const std::unordered_map<std::string, TrackInfo>& table);

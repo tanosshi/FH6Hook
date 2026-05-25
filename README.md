@@ -6,6 +6,8 @@ This project builds a `version.dll` proxy that runs inside the game process. It 
 
 The game does not expose a now-playing API. The hook reconstructs the active track from file reads against FMOD `.bank` files.
 
+The DLL can be universally used by any external listener, such as the included Python scrobbler for Last.fm integration. You could also use the DLL for overlays, logging, or other creative uses. I am not stopping you, but I do ask you to credit me
+
 The current method does **NOT** trigger the anti-cheat, anti-tamper or any suspicious activity as it only observes file reads and does not modify game code or memory. The hooks are narrow and efficient, and the telemetry is emitted asynchronously through a named pipe.
 
 ## Hook Summary

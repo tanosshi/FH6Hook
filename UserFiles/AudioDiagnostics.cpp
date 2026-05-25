@@ -47,8 +47,6 @@ namespace {
     static std::string g_currentPlay;
     static ULONGLONG g_lastMusicReadAt = 0;
     static ULONGLONG g_lastPingAt = 0;
-    static std::mutex g_recentTrackMtx;
-    static std::unordered_map<int, const TrackInfo*> g_recentTrackByStation;
 
     static void Enqueue(std::string line) {
         std::lock_guard<std::mutex> lk(g_outMtx);
@@ -300,29 +298,6 @@ namespace {
         }
     }
 
-    static void RememberRecentTrack(const TrackInfo& t) {
-        const int station = StationFromSound(t.soundName);
-        if (station <= 0)
-            return;
-
-        std::lock_guard<std::mutex> lk(g_recentTrackMtx);
-        g_recentTrackByStation[station] = &t;
-    }
-
-    static const TrackInfo* RecentTrackForPrefix(const std::string& prefix) {
-        const int station = StationFromSound(prefix);
-        if (station <= 0)
-            return nullptr;
-
-        std::lock_guard<std::mutex> lk(g_recentTrackMtx);
-        auto it = g_recentTrackByStation.find(station);
-        return it == g_recentTrackByStation.end() ? nullptr : it->second;
-    }
-
-    static bool TrackMatchesPrefix(const TrackInfo& t, const std::string& prefix) {
-        return prefix.empty() || t.soundName.rfind(prefix, 0) == 0;
-    }
-
     static void CheckMusicStop() {
         std::lock_guard<std::mutex> lk(g_musicMtx);
         if (g_currentPlay.empty() || GetTickCount64() - g_lastMusicReadAt < kStopAfterMs)
@@ -352,6 +327,8 @@ namespace {
         std::lock_guard<std::mutex> lk(g_handleMtx);
         auto it = g_bankHandles.find(h);
         if (it == g_bankHandles.end())
+            return false;
+        if (it->second.readLogs >= 512)
             return false;
         ++it->second.readLogs;
         out = it->second;
@@ -402,11 +379,10 @@ namespace {
         }
 
         std::string prefix;
-        if (GetTickCount64() - g_startTick < 25000) {
+        if (GetTickCount64() - g_startTick < 25000 || !ReadWindowActive(prefix)) {
             SetLastError(lastError);
             return ok;
         }
-        const bool readWindowActive = ReadWindowActive(prefix);
 
         BankHandleInfo info;
         if (!TryGetBankHandleInfo(file, info)) {
@@ -434,11 +410,8 @@ namespace {
         }
 
         if (hasOffset) {
-            if (const TrackInfo* track = FindTrackForRead(info, offset)) {
-                RememberRecentTrack(*track);
-                if (readWindowActive && TrackMatchesPrefix(*track, prefix))
-                    NoteMusicRead(*track);
-            }
+            if (const TrackInfo* track = FindTrackForRead(info, offset))
+                NoteMusicRead(*track);
         }
 
         SetLastError(lastError);
@@ -509,13 +482,6 @@ void AudioDiagnosticsArmReadWindow(const std::string& stationPrefix)
     }
     PipeWriteLine("READ|armed|prefix=" + stationPrefix + "|window_ms=" + std::to_string(kReadWindowMs));
 
-    if (const TrackInfo* track = RecentTrackForPrefix(stationPrefix))
-        NoteMusicRead(*track);
-}
-
-void AudioDiagnosticsQueueBankCache(const std::string& path)
-{
-    QueueBankCachePath(path);
 }
 
 void AudioDiagnosticsSetTrackTable(const std::unordered_map<std::string, TrackInfo>& table)
@@ -523,10 +489,6 @@ void AudioDiagnosticsSetTrackTable(const std::unordered_map<std::string, TrackIn
     std::lock_guard<std::mutex> lk(g_rangeMtx);
     g_trackTable = table;
     g_bankRanges.clear();
-    {
-        std::lock_guard<std::mutex> recentLock(g_recentTrackMtx);
-        g_recentTrackByStation.clear();
-    }
     {
         std::lock_guard<std::mutex> cacheLock(g_cacheQueueMtx);
         g_pendingBankCachePaths.clear();

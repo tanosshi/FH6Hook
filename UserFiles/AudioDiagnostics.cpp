@@ -41,12 +41,22 @@ namespace {
         const TrackInfo* track = nullptr;
     };
 
+    struct PendingRead {
+        unsigned long long offset = 0;
+        ULONGLONG seenAt = 0;
+        std::string prefix;
+    };
+
     static std::mutex g_rangeMtx;
     static std::unordered_map<std::string, std::vector<BankRange>> g_bankRanges;
+    static std::mutex g_pendingReadMtx;
+    static std::unordered_map<std::string, PendingRead> g_pendingReads;
     static std::mutex g_musicMtx;
     static std::string g_currentPlay;
     static ULONGLONG g_lastMusicReadAt = 0;
     static ULONGLONG g_lastPingAt = 0;
+
+    static void NoteMusicRead(const TrackInfo& t);
 
     static void Enqueue(std::string line) {
         std::lock_guard<std::mutex> lk(g_outMtx);
@@ -120,6 +130,10 @@ namespace {
             n = n * 10 + (lower[i] - '0');
         }
         return n;
+    }
+
+    static bool TrackMatchesPrefix(const TrackInfo& track, const std::string& prefix) {
+        return prefix.empty() || track.soundName.rfind(prefix, 0) == 0;
     }
 
     static unsigned long long Bits(unsigned long long value, int start, int length) {
@@ -234,6 +248,34 @@ namespace {
         g_pendingBankCachePaths.emplace(bank, path);
     }
 
+    static void RememberPendingRead(const std::string& bank, unsigned long long offset, const std::string& prefix) {
+        std::lock_guard<std::mutex> lk(g_pendingReadMtx);
+        g_pendingReads[bank] = PendingRead{ offset, GetTickCount64(), prefix };
+    }
+
+    static bool TakePendingRead(const std::string& bank, PendingRead& pending) {
+        std::lock_guard<std::mutex> lk(g_pendingReadMtx);
+        auto it = g_pendingReads.find(bank);
+        if (it == g_pendingReads.end())
+            return false;
+
+        pending = it->second;
+        g_pendingReads.erase(it);
+        return GetTickCount64() - pending.seenAt <= kReadWindowMs;
+    }
+
+    static const TrackInfo* FindTrackInRanges(
+        const std::vector<BankRange>& ranges,
+        unsigned long long offset,
+        const std::string& prefix)
+    {
+        for (const auto& r : ranges) {
+            if (offset >= r.start && offset < r.end && r.track && TrackMatchesPrefix(*r.track, prefix))
+                return r.track;
+        }
+        return nullptr;
+    }
+
     static void DrainBankCacheQueue() {
         std::unordered_map<std::string, std::string> pending;
         {
@@ -261,23 +303,38 @@ namespace {
             if (ranges.empty())
                 continue;
 
-            std::lock_guard<std::mutex> lk(g_rangeMtx);
-            g_bankRanges.emplace(bank, std::move(ranges));
+            PendingRead pendingRead;
+            const bool hasPendingRead = TakePendingRead(bank, pendingRead);
+            const TrackInfo* pendingTrack = hasPendingRead
+                ? FindTrackInRanges(ranges, pendingRead.offset, pendingRead.prefix)
+                : nullptr;
+
+            {
+                std::lock_guard<std::mutex> lk(g_rangeMtx);
+                g_bankRanges.emplace(bank, std::move(ranges));
+            }
+
+            if (pendingTrack) {
+                Enqueue("READ|replayed|bank=" + bank);
+                NoteMusicRead(*pendingTrack);
+            }
         }
     }
 
-    static const TrackInfo* FindTrackForRead(const BankHandleInfo& info, unsigned long long offset) {
+    static const TrackInfo* FindTrackForRead(
+        const BankHandleInfo& info,
+        unsigned long long offset,
+        const std::string& prefix)
+    {
         const std::string bank = FH6String::ToLower(info.base);
         {
             std::lock_guard<std::mutex> lk(g_rangeMtx);
             auto it = g_bankRanges.find(bank);
             if (it != g_bankRanges.end()) {
-                for (const auto& r : it->second) {
-                    if (offset >= r.start && offset < r.end)
-                        return r.track;
-                }
+                return FindTrackInRanges(it->second, offset, prefix);
             }
         }
+        RememberPendingRead(bank, offset, prefix);
         QueueBankCachePath(info.path);
         return nullptr;
     }
@@ -410,7 +467,7 @@ namespace {
         }
 
         if (hasOffset) {
-            if (const TrackInfo* track = FindTrackForRead(info, offset))
+            if (const TrackInfo* track = FindTrackForRead(info, offset, prefix))
                 NoteMusicRead(*track);
         }
 
@@ -492,6 +549,10 @@ void AudioDiagnosticsSetTrackTable(const std::unordered_map<std::string, TrackIn
     {
         std::lock_guard<std::mutex> cacheLock(g_cacheQueueMtx);
         g_pendingBankCachePaths.clear();
+    }
+    {
+        std::lock_guard<std::mutex> pendingLock(g_pendingReadMtx);
+        g_pendingReads.clear();
     }
 }
 

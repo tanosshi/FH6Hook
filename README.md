@@ -6,7 +6,7 @@ This project builds a `version.dll` proxy that runs inside the game process. It 
 
 The game does not expose a now-playing API. The hook reconstructs the active track from file reads against FMOD `.bank` files.
 
-The DLL can be universally used by any external listener, such as the included Python scrobbler for Last.fm integration. You could also use the DLL for overlays, logging, or other creative uses. I am not stopping you, but I do ask you to credit me
+The DLL can be universally used by any external listener, such as the [Python scrobbler for Last.fm integration](https://github.com/tanosshi/FH6Scrobbler). You could also use the DLL for overlays, logging, or other creative uses.
 
 The current method does **NOT** trigger the anti-cheat, anti-tamper or any suspicious activity as it only observes file reads and does not modify game code or memory. The hooks are narrow and efficient, and the telemetry is emitted asynchronously through a named pipe.
 
@@ -83,14 +83,13 @@ Vendored TinyXML2 parser used to read `RadioInfo_EN.xml`.
 Only target `Release|x64` for building.
 
 The project expects Microsoft Detours headers and libraries under:
-
 ```txt
 Detours-src\include
 Detours-src\lib.X64
 ```
+Use the build_detours_x64.bat script to build Detours if you don't have it already.
 
 Typical build command:
-
 ```powershell
 msbuild version.sln /p:Configuration=Release /p:Platform=x64 /m
 ``` 
@@ -105,7 +104,7 @@ x64\Release\version.dll
 ## Runtime Notes
 
 - The named pipe is `\\.\pipe\molotov`.
-- The XML metadata path is `media\Audio\RadioInfo_EN.xml`, relative to the game executable directory.
+- The XML metadata path must be `media\Audio\RadioInfo_EN.xml`, relative to the game executable directory.
 - Startup radio-bank preload is noisy, so station detection waits for preload progress or the preload timeout before arming normal read windows.
 - Track detection is based on observed file reads, not direct FMOD event callbacks.
 

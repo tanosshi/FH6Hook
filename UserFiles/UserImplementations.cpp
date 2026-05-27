@@ -7,6 +7,7 @@
 #include <unordered_map>
 #include <cassert>
 #include <tchar.h>
+#include <mutex>
 
 #include "tinyxml2.h"
 
@@ -17,9 +18,12 @@ namespace Config
 }
 
 static HANDLE g_pipeHandle = INVALID_HANDLE_VALUE;
+static std::mutex g_pipeMutex;
 
 void PipeWriteLine(const std::string& line)
 {
+    std::lock_guard<std::mutex> lock(g_pipeMutex);
+
     if (g_pipeHandle == INVALID_HANDLE_VALUE) {
         HANDLE h = CreateFileA(Config::PIPE_NAME, GENERIC_WRITE, 0,
             nullptr, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, nullptr);

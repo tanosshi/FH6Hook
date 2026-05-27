@@ -5,4 +5,4 @@ cd /d "%~dp0Detours-src\src"
 nmake clean
 nmake "CFLAGS=/W4 /WX /Zi /MD /Gy /Gm- /Zl /Od /DWIN32_LEAN_AND_MEAN /D_WIN32_WINNT=0x501"
 echo.
-echo Built: %~dp0Detours-src\lib.X64\detours.lib
+echo Built: %~dp0Detours-src\lib.X64\ and %~dp0Detours-src\include

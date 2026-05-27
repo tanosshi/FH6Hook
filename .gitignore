@@ -39,9 +39,6 @@ ipch/
 *.exe
 *.exp
 
-# Generated files
-GeneratedFiles/
-
 # Temporary files
 *.tmp
 *.bak

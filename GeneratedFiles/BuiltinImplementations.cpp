@@ -1,0 +1,33 @@
+#include "MemoryPatchConfig.h"
+#include "resource.h"
+
+namespace
+{
+    void ApplyResourceBasedPatches()
+    {
+        const auto configs = LoadConfigurations(IDR_TXT2);
+
+        if (!configs.empty())
+        {
+            PatchMemoryWithConfig(configs);
+        }
+    }
+
+    void ApplyFileBasedPatches()
+    {
+        const auto configs = LoadFileConfigurations();
+
+        if (!configs.empty())
+        {
+            PatchMemoryWithConfig(configs);
+        }
+    }    
+}
+
+
+// apply patches based on resource text files
+void ApplyBuiltinPatches()
+{
+    ApplyResourceBasedPatches();
+    ApplyFileBasedPatches();
+}

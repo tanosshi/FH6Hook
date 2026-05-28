@@ -89,6 +89,8 @@ Detours-src\lib.X64
 ```
 Use the build_detours_x64.bat script to build Detours if you don't have it already.
 
+GitHub Actions downloads the Microsoft Detours and builds it automatically for release builds. Local builds still need `Detours-src` in the project folder.`.
+
 Typical build command:
 ```powershell
 msbuild version.sln /p:Configuration=Release /p:Platform=x64 /m

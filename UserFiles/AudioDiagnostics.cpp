@@ -11,9 +11,7 @@
 #include <vector>
 #include <mutex>
 
-#if FH6_USE_DETOURS
 #include <detours.h>
-#endif
 
 extern void PipeWriteLine(const std::string& line);
 extern void LogInfo(const std::string& m);
@@ -486,10 +484,7 @@ namespace {
 void InstallAudioDiagnosticHooks()
 {
     if (g_hooksInstalled) return;
-#if !FH6_USE_DETOURS
-    LogWarn("Hooks disabled (FH6_USE_DETOURS=0)");
-    return;
-#else
+
     HMODULE k32 = GetModuleHandleA("kernel32.dll");
     if (!k32) { LogWarn("InstallAudioDiagnosticHooks: kernel32 not found"); return; }
 
@@ -527,7 +522,6 @@ void InstallAudioDiagnosticHooks()
 
     g_hooksInstalled = true;
     LogInfo("Hooked CreateFileW/ReadFile/CloseHandle (radio bank read telemetry)");
-#endif
 }
 
 void AudioDiagnosticsArmReadWindow(const std::string& stationPrefix)

@@ -1,4 +1,4 @@
-# FH6Hooks
+# FH6Hook
 
 Real-time radio tracking for FH6.
 

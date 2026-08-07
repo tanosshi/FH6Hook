@@ -1739,7 +1739,10 @@ extern void GetOriginalLibraryPath(TCHAR* bufferPtr, int bufferLength, const TCH
 
 void CheckedLoad()
 {
-    TCHAR szPath[MAX_PATH] = TEXT("version_original.dll");
+    TCHAR szPath[MAX_PATH];
+
+    GetSystemDirectory(szPath, MAX_PATH);
+    lstrcat(szPath, TEXT("\\version.dll"));
 
     const HMODULE module = LoadLibrary(szPath);
 
